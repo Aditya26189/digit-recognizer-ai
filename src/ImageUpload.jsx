@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Upload, CheckCircle, AlertCircle, Loader2, X } from 'lucide-react';
+import { Upload, CheckCircle, AlertCircle, Loader2, X, ExternalLink, Copy } from 'lucide-react';
 import { uploadImageToStorage } from './utils/storageService';
 import { auth } from './config/firebase';
 import { identifyDigit } from './utils/geminiService';
@@ -14,6 +14,7 @@ export default function ImageUpload({ onAnalyze }) {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [recognizedDigit, setRecognizedDigit] = useState(null);
   const [storageError, setStorageError] = useState(null);
+  const [copied, setCopied] = useState(false);
   const fileInputRef = useRef(null);
 
   // Cleanup preview URL on unmount or when file changes
@@ -149,8 +150,21 @@ export default function ImageUpload({ onAnalyze }) {
     setUploadProgress(null);
     setRecognizedDigit(null);
     setStorageError(null);
+    setCopied(false);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
+    }
+  };
+
+  const handleCopyURL = async () => {
+    if (uploadedImageURL) {
+      try {
+        await navigator.clipboard.writeText(uploadedImageURL);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      } catch (err) {
+        console.error('Failed to copy:', err);
+      }
     }
   };
 
@@ -163,72 +177,148 @@ export default function ImageUpload({ onAnalyze }) {
   };
 
   return (
-    <div className="max-w-3xl mx-auto">
-      {/* Main Upload Card */}
-      <div className="bg-white rounded-2xl shadow-lg p-8 mb-6">
+    <div className="w-full max-w-[760px] mx-auto">
+      {/* Main Card - Glass Panel */}
+      <div 
+        className="glass-card p-6 md:p-9 animate-slideUp"
+        style={{ animationDelay: '100ms' }}
+      >
         {!selectedFile ? (
           /* Upload Drop Zone */
           <div
-            className={`relative border-2 border-dashed rounded-xl p-12 text-center transition-all cursor-pointer ${
-              isDragging
-                ? 'border-indigo-500 bg-indigo-50 scale-[1.02]'
-                : 'border-gray-300 hover:border-indigo-400 hover:bg-gray-50'
-            }`}
+            className={`
+              relative border-2 border-dashed rounded-[18px] p-8 md:p-12 text-center 
+              transition-all duration-300 cursor-pointer group
+              focus-within:ring-2 focus-within:ring-brand-orange/40 focus-within:outline-none
+              ${isDragging
+                ? 'border-brand-orange bg-brand-orange/5 ring-1 ring-brand-orange/30 scale-[1.01] -translate-y-1'
+                : 'border-slate-700/50 hover:border-brand-orange/30 hover:bg-white/[0.02] hover:-translate-y-1 hover:shadow-lg hover:shadow-brand-orange/5'
+              }
+            `}
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
-            onClick={() => fileInputRef.current.click()}
+            onClick={() => fileInputRef.current?.click()}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                fileInputRef.current?.click();
+              }
+            }}
+            aria-label="Upload image"
           >
-            <div className="flex flex-col items-center gap-4">
-              <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center">
-                <Upload className="w-8 h-8 text-indigo-600" />
+            <div className="flex flex-col items-center gap-5">
+              <div className="w-12 h-12 rounded-full bg-brand-orange flex items-center justify-center shadow-lg shadow-brand-orange/20 transition-transform group-hover:scale-110 duration-300">
+                <Upload className="w-6 h-6 text-white" />
               </div>
               <div>
-                <p className="text-lg font-semibold text-gray-900 mb-1">
-                  Drop your image here
+                <p className="text-lg md:text-xl font-bold text-text-primary mb-1.5">
+                  Drop or click to upload
                 </p>
-                <p className="text-sm text-gray-500">
-                  or click to browse from your device
+                <p className="text-sm text-text-secondary font-medium">
+                  PNG / JPG · max 5MB
                 </p>
-              </div>
-              <div className="text-xs text-gray-400 bg-gray-100 px-4 py-2 rounded-full">
-                PNG, JPG, JPEG • Max 5MB
               </div>
             </div>
           </div>
         ) : (
-          /* Preview & Analyze */
-          <div>
-            <div className="relative mb-6">
-              <div className="aspect-video bg-gray-100 rounded-xl overflow-hidden flex items-center justify-center">
-                <img
-                  src={imagePreview}
-                  alt="Preview"
-                  className="max-w-full max-h-full object-contain"
-                />
+          /* Preview & Actions */
+          <div className="space-y-6 md:space-y-8">
+            <div className="flex flex-col md:flex-row gap-6 md:gap-8">
+              {/* Preview Thumbnail */}
+              <div className="flex-shrink-0 self-start">
+                <div className="relative w-full md:w-32 h-64 md:h-32 rounded-xl overflow-hidden border border-white/5 shadow-inner bg-[#0b1114] flex items-center justify-center group transition-transform hover:-translate-y-1 duration-300">
+                  <img
+                    src={imagePreview}
+                    alt="Uploaded digit preview"
+                    className="max-w-full max-h-full object-contain p-2"
+                  />
+                  <button
+                    onClick={handleClear}
+                    className="absolute top-2 right-2 bg-slate-900/80 hover:bg-red-600/90 text-white rounded-full p-1.5 transition-all shadow-md focus:outline-none focus:ring-2 focus:ring-red-500/40 md:hidden"
+                    title="Remove image"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
-              <button
-                onClick={handleClear}
-                className="absolute top-3 right-3 bg-white hover:bg-red-50 text-red-500 rounded-full p-2 shadow-lg transition-all border border-red-200"
-                title="Remove"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            
-            <div className="text-center mb-6">
-              <p className="text-sm font-medium text-gray-700 truncate">{selectedFile.name}</p>
-              <p className="text-xs text-gray-500">{formatFileSize(selectedFile.size)}</p>
+
+              {/* File Meta & Actions */}
+              <div className="flex-1 flex flex-col justify-center min-w-0">
+                <div className="mb-5">
+                  <p className="text-base font-medium text-text-primary truncate" title={selectedFile.name}>
+                    {selectedFile.name}
+                  </p>
+                  <p className="text-sm text-text-secondary mt-1">
+                    {formatFileSize(selectedFile.size)}
+                  </p>
+                </div>
+
+                {/* Action Buttons */}
+                {!isAnalyzing && !recognizedDigit && (
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <button
+                      onClick={handleAnalyze}
+                      disabled={!auth.currentUser}
+                      className="
+                        flex-1 flex items-center justify-center gap-2
+                        bg-brand-orange hover:bg-brand-orange-dark active:scale-[0.98]
+                        text-white px-5 py-3 rounded-[10px] font-bold text-sm md:text-base
+                        transition-all duration-200 shadow-lg shadow-brand-orange/10
+                        disabled:opacity-50 disabled:cursor-not-allowed
+                        focus:outline-none focus:ring-[3px] focus:ring-brand-orange/20
+                      "
+                    >
+                      Analyze Digit
+                    </button>
+                    <button
+                      onClick={handleClear}
+                      className="
+                        px-5 py-3 rounded-[10px] font-medium text-sm md:text-base
+                        text-text-secondary hover:text-text-primary
+                        border border-white/5 hover:border-white/10 hover:bg-white/5
+                        transition-all duration-200
+                        focus:outline-none focus:ring-[3px] focus:ring-slate-500/20
+                      "
+                    >
+                      Clear
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
 
-            {!isAnalyzing && !recognizedDigit && (
-              <button
-                onClick={handleAnalyze}
-                disabled={!auth.currentUser}
-                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3.5 rounded-xl font-semibold shadow-md hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Analyze Digit with AI
-              </button>
+            {/* Cloud Storage Status */}
+            {uploadedImageURL && (
+              <div className="flex items-center justify-between gap-3 p-3 bg-white/[0.03] rounded-lg border border-white/5">
+                <div className="flex items-center gap-2 min-w-0">
+                  <CheckCircle className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+                  <span className="text-sm text-text-secondary">Image saved to cloud</span>
+                </div>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <button
+                    onClick={handleCopyURL}
+                    className="p-2 text-text-secondary hover:text-text-primary hover:bg-white/5 rounded transition-all focus:outline-none focus:ring-2 focus:ring-brand-orange/40"
+                    title="Copy URL"
+                  >
+                    <Copy className="w-4 h-4" />
+                  </button>
+                  <a
+                    href={uploadedImageURL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="p-2 text-text-secondary hover:text-text-primary hover:bg-white/5 rounded transition-all focus:outline-none focus:ring-2 focus:ring-brand-orange/40"
+                    title="View image"
+                  >
+                    <ExternalLink className="w-4 h-4" />
+                  </a>
+                </div>
+              </div>
+            )}
+            {copied && (
+              <p className="text-xs text-emerald-400 text-center">URL copied to clipboard!</p>
             )}
           </div>
         )}
@@ -236,63 +326,68 @@ export default function ImageUpload({ onAnalyze }) {
 
       {/* Loading Progress */}
       {isAnalyzing && (
-        <div className="bg-white rounded-xl shadow-md p-6 mb-6 animate-fadeIn">
+        <div className="mt-6 glass-panel rounded-xl p-6 shadow-md animate-fadeIn">
           <div className="flex items-center gap-3 mb-3">
-            <Loader2 className="w-5 h-5 text-indigo-600 animate-spin" />
-            <p className="text-gray-700 font-medium">{uploadProgress}</p>
+            <div className="relative w-5 h-5">
+              <Loader2 className="w-5 h-5 text-brand-orange animate-spin" />
+            </div>
+            <p className="text-text-primary font-medium">{uploadProgress}</p>
           </div>
-          <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
-            <div className="h-full bg-gradient-to-r from-indigo-600 to-purple-600 animate-pulse w-full rounded-full"></div>
+          <div className="h-1.5 bg-slate-800/50 rounded-full overflow-hidden">
+            <div 
+              className="h-full bg-brand-orange rounded-full animate-pulse"
+              style={{ width: '100%' }}
+            ></div>
           </div>
         </div>
       )}
 
-      {/* Result Card with Side-by-Side Layout */}
+      {/* Result Display */}
       {recognizedDigit && !isAnalyzing && (
-        <div className="bg-white rounded-2xl shadow-lg p-8 animate-scaleIn">
-          <div className="grid md:grid-cols-2 gap-8 items-center">
-            {/* Left: Thumbnail */}
-            <div>
-              <p className="text-sm font-medium text-gray-500 mb-3">Your Image</p>
-              <div className="aspect-square bg-gray-100 rounded-xl overflow-hidden flex items-center justify-center border-2 border-gray-200">
-                <img
-                  src={imagePreview}
-                  alt="Uploaded"
-                  className="max-w-full max-h-full object-contain"
-                />
-              </div>
-            </div>
-
-            {/* Right: The Big Number */}
-            <div className="text-center md:text-left">
-              <p className="text-sm font-medium text-gray-500 mb-2">AI Prediction</p>
-              <div className="text-9xl font-bold text-indigo-600 mb-4 leading-none">
-                {recognizedDigit}
-              </div>
-              <div className="flex items-center gap-2 text-emerald-600">
-                <CheckCircle className="w-5 h-5" />
-                <span className="text-sm font-medium">Successfully identified</span>
-              </div>
-            </div>
+        <div className="mt-6 glass-card p-8 animate-scaleIn flex flex-col items-center text-center">
+          <p className="text-sm font-medium text-text-secondary mb-4 uppercase tracking-wider">Identified Digit</p>
+          <div 
+            className="
+              inline-flex items-center justify-center
+              bg-brand-orange
+              rounded-2xl w-24 h-24 md:w-32 md:h-32
+              shadow-2xl shadow-brand-orange/20
+              mb-6
+            "
+          >
+            <span className="text-6xl md:text-8xl font-bold text-white leading-none">
+              {recognizedDigit}
+            </span>
           </div>
+          <div className="flex items-center justify-center gap-2 text-emerald-400 bg-emerald-400/10 px-4 py-2 rounded-full border border-emerald-400/20">
+            <CheckCircle className="w-4 h-4" />
+            <span className="text-sm font-medium">Successfully identified</span>
+          </div>
+          
+          <button
+            onClick={handleClear}
+            className="mt-8 text-text-secondary hover:text-text-primary text-sm font-medium hover:underline decoration-brand-orange/50 underline-offset-4 transition-all"
+          >
+            Analyze another image
+          </button>
         </div>
       )}
 
       {/* Error Message */}
       {error && (
-        <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-start gap-3">
-          <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+        <div className="mt-6 bg-red-500/10 border border-red-500/20 rounded-xl p-4 flex items-start gap-3 animate-fadeIn">
+          <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
           <div>
-            <p className="text-red-800 font-medium">Error</p>
-            <p className="text-red-600 text-sm mt-1">{error}</p>
+            <p className="text-red-300 font-medium">Error</p>
+            <p className="text-red-400 text-sm mt-1">{error}</p>
           </div>
         </div>
       )}
 
       {/* Storage Warning */}
       {storageError && (
-        <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 mt-4">
-          <p className="text-amber-800 text-xs">{storageError}</p>
+        <div className="mt-4 bg-amber-500/10 border border-amber-500/20 rounded-lg p-3">
+          <p className="text-amber-300 text-xs">{storageError}</p>
         </div>
       )}
 
@@ -303,6 +398,7 @@ export default function ImageUpload({ onAnalyze }) {
         className="sr-only"
         accept="image/png, image/jpeg, image/jpg"
         onChange={handleFileInput}
+        aria-label="File upload input"
       />
     </div>
   );
