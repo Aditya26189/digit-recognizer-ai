@@ -1,32 +1,42 @@
-/**
- * Import function triggers from their respective submodules:
- *
- * const {onCall} = require("firebase-functions/v2/https");
- * const {onDocumentWritten} = require("firebase-functions/v2/firestore");
- *
- * See a full list of supported triggers at https://firebase.google.com/docs/functions
- */
+const { onRequest } = require("firebase-functions/v2/https");
+const { GoogleGenerativeAI } = require("@google/generative-ai");
+const cors = require("cors")({ origin: true });
 
-const {setGlobalOptions} = require("firebase-functions");
-const {onRequest} = require("firebase-functions/https");
-const logger = require("firebase-functions/logger");
+// Initialize Gemini with API key from environment
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-// For cost control, you can set the maximum number of containers that can be
-// running at the same time. This helps mitigate the impact of unexpected
-// traffic spikes by instead downgrading performance. This limit is a
-// per-function limit. You can override the limit for each function using the
-// `maxInstances` option in the function's options, e.g.
-// `onRequest({ maxInstances: 5 }, (req, res) => { ... })`.
-// NOTE: setGlobalOptions does not apply to functions using the v1 API. V1
-// functions should each use functions.runWith({ maxInstances: 10 }) instead.
-// In the v1 API, each function can only serve one request per container, so
-// this will be the maximum concurrent request count.
-setGlobalOptions({ maxInstances: 10 });
+exports.identifyDigit = onRequest(async (req, res) => {
+  // Enable CORS
+  cors(req, res, async () => {
+    if (req.method !== "POST") {
+      return res.status(405).send("Method Not Allowed");
+    }
 
-// Create and deploy your first functions
-// https://firebase.google.com/docs/functions/get-started
+    try {
+      const { imageBase64, mimeType } = req.body;
 
-// exports.helloWorld = onRequest((request, response) => {
-//   logger.info("Hello logs!", {structuredData: true});
-//   response.send("Hello from Firebase!");
-// });
+      if (!imageBase64) {
+        return res.status(400).send("No image provided");
+      }
+
+      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+      
+      const result = await model.generateContent([
+        "Identify the handwritten digit in this image. Return ONLY the number.",
+        {
+          inlineData: {
+            data: imageBase64,
+            mimeType: mimeType || "image/jpeg"
+          }
+        }
+      ]);
+
+      const text = result.response.text().trim();
+      res.json({ digit: text });
+
+    } catch (error) {
+      console.error("Error identifying digit:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+});

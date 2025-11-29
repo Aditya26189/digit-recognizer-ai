@@ -1,81 +1,65 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
-
-const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
-
 /**
- * Converts a File object to a Google Generative AI compatible part.
- * @param {File} file - The image file to convert.
- * @returns {Promise<{inlineData: {data: string, mimeType: string}}>}
+ * Helper function to convert File to base64 string
+ * @param {File} file - The image file
+ * @returns {Promise<string>} - Base64 encoded string without data URL prefix
  */
-async function fileToGenerativePart(file) {
+async function fileToBase64(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onloadend = () => {
-      // Remove the data URL prefix (e.g., "data:image/jpeg;base64,") to get pure base64
-      const base64String = reader.result.split(',')[1];
-      resolve({
-        inlineData: {
-          data: base64String,
-          mimeType: file.type,
-        },
-      });
+      // Remove data URL prefix (e.g., "data:image/jpeg;base64,")
+      const base64 = reader.result.split(',')[1];
+      resolve(base64);
     };
-    reader.onerror = (error) => reject(error);
+    reader.onerror = reject;
     reader.readAsDataURL(file);
   });
 }
 
 /**
- * Identifies a handwritten digit from an image file using Google Gemini API.
- * @param {File} file - The image file containing the digit.
- * @returns {Promise<string>} - The identified digit.
- * @throws {Error} - If analysis fails or configuration is missing.
+ * Calls the Firebase Cloud Function to identify a digit
+ * @param {File} file - The image file containing the digit
+ * @returns {Promise<string>} - The identified digit
  */
 export async function identifyDigit(file) {
-  if (!API_KEY) {
-    throw new Error("API key not configured. Please set VITE_GEMINI_API_KEY.");
-  }
-
   if (!file) {
     throw new Error("No file provided.");
   }
 
   try {
-    // Initialize Gemini API
-    const genAI = new GoogleGenerativeAI(API_KEY);
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+    // Convert file to base64
+    const imageBase64 = await fileToBase64(file);
+    
+    // Get the function URL from environment variable
+    const functionUrl = import.meta.env.VITE_FUNCTION_URL || 'http://127.0.0.1:5001/digit-recognizer-aditya/us-central1/identifyDigit';
+    
+    // Call the Cloud Function
+    const response = await fetch(functionUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        imageBase64,
+        mimeType: file.type
+      })
+    });
 
-    // Prepare image data
-    const imagePart = await fileToGenerativePart(file);
-
-    // Prompt engineering
-    const prompt = "Look at this image of a handwritten digit. Identify the single digit (0-9) written in the image. Return ONLY the digit as a number with no additional text, explanation, or punctuation.";
-
-    // Call API
-    const result = await model.generateContent([prompt, imagePart]);
-    const response = await result.response;
-    const text = response.text();
-
-    if (!text) {
-      throw new Error("No digit detected in image");
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Server error: ${response.status} - ${errorText}`);
     }
 
-    // Clean the response: remove whitespace and non-digit characters
-    const cleanedText = text.trim().replace(/\D/g, '');
-
-    if (cleanedText.length === 0) {
-      throw new Error("Invalid response from API: No digits found");
+    const data = await response.json();
+    
+    if (!data.digit) {
+      throw new Error('No digit returned from server');
     }
 
-    // Return the identified digit(s)
-    return cleanedText;
+    return data.digit;
 
   } catch (error) {
-    console.error("Gemini Service Error:", error);
-    // Re-throw with a user-friendly message if it's not already one of our custom errors
-    if (error.message.includes("API key") || error.message.includes("No file") || error.message.includes("No digit") || error.message.includes("Invalid response")) {
-      throw error;
-    }
-    throw new Error(`Failed to analyze image: ${error.message}`);
+    console.error('Error calling Cloud Function:', error);
+    throw new Error(`Failed to identify digit: ${error.message}`);
   }
 }
