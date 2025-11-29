@@ -1,216 +1,139 @@
-// React imports
 import { useState, useEffect } from 'react'
-
-// Firebase Auth imports
+import { auth, googleProvider } from './config/firebase'
 import { signInWithPopup, signOut, onAuthStateChanged } from 'firebase/auth'
-
-// Firebase Storage imports
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'
-
-// Firebase config and services
-import { auth, storage, googleProvider } from './config/firebase'
-
-// Components
 import ImageUpload from './ImageUpload'
 
-// Utilities
-import { identifyDigit } from './utils/geminiService'
-import './App.css'
-
 function App() {
-  // Authentication state
   const [user, setUser] = useState(null)
-  const [authLoading, setAuthLoading] = useState(true)
-  
-  // Analysis state
-  const [result, setResult] = useState(null)
-  const [loading, setLoading] = useState(false)
-  const [loadingText, setLoadingText] = useState('')
-  const [error, setError] = useState(null)
-  const [signingIn, setSigningIn] = useState(false)
+  const [loading, setLoading] = useState(true)
 
-  // Authentication state listener
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser)
-      setAuthLoading(false)
+      setLoading(false)
     })
-    // Cleanup subscription on unmount
     return () => unsubscribe()
   }, [])
 
-  // Handle Google Sign-In with error handling
   const handleGoogleSignIn = async () => {
-    setSigningIn(true)
     try {
       await signInWithPopup(auth, googleProvider)
-      // User state will auto-update via onAuthStateChanged
-    } catch (err) {
-      console.error('Sign-in error:', err)
-      
-      // Handle specific error codes
-      if (err.code === 'auth/popup-closed-by-user') {
-        alert('Sign-in cancelled')
-      } else if (err.code === 'auth/network-request-failed') {
-        alert('Network error, check internet connection')
-      } else if (err.code === 'auth/popup-blocked') {
-        alert('Pop-up blocked by browser. Please allow pop-ups for this site.')
-      } else {
-        alert('Sign-in failed: ' + err.message)
-      }
-    } finally {
-      setSigningIn(false)
+    } catch (error) {
+      console.error("Error signing in:", error)
+      alert(error.message)
     }
   }
 
-  // Handle Sign-Out
   const handleSignOut = async () => {
     try {
       await signOut(auth)
-      // Clear analysis results on sign out
-      setResult(null)
-      setError(null)
-    } catch (err) {
-      console.error('Sign-out error:', err)
-      alert('Failed to sign out: ' + err.message)
+    } catch (error) {
+      console.error("Error signing out:", error)
     }
   }
 
-  // Analysis handler with Firebase Storage upload
-  const handleAnalyze = async (file) => {
-    if (!user) {
-      setError('Please sign in first')
-      return
-    }
-
-    setLoading(true)
-    setError(null)
-    setResult(null)
-
-    try {
-      // Step 1: Upload to Firebase Storage
-      setLoadingText('Uploading...')
-      const storageRef = ref(storage, `uploads/${user.uid}/${Date.now()}_${file.name}`)
-      await uploadBytes(storageRef, file)
-      const downloadURL = await getDownloadURL(storageRef)
-      console.log('File uploaded successfully:', downloadURL)
-
-      // Step 2: Analyze with Gemini
-      setLoadingText('Analyzing...')
-      const digit = await identifyDigit(file)
-      setResult(digit)
-    } catch (err) {
-      console.error('Analysis error:', err)
-      setError(err.message)
-    } finally {
-      setLoading(false)
-      setLoadingText('')
-    }
-  }
-
-  // Loading state - Show while checking auth
-  if (authLoading) {
+  if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
-        <div className="text-center">
-          <div className="inline-block animate-spin rounded-full h-16 w-16 border-b-4 border-blue-600 mb-4"></div>
-          <p className="text-xl text-gray-700">Loading...</p>
-        </div>
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-600"></div>
       </div>
     )
   }
 
-  // Not logged in - Show login page
   if (!user) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 px-4">
-        <div className="text-center">
-          <div className="bg-white rounded-2xl shadow-2xl p-12 max-w-md">
-            <div className="text-7xl mb-6">🔐</div>
-            <h1 className="text-3xl font-bold text-gray-800 mb-3">
-              Handwritten Digit Recognizer
-            </h1>
-            <p className="text-gray-600 mb-8">
-              Sign in to analyze handwritten digits using AI
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-gray-900 to-gray-800 text-white p-4">
+        <div className="max-w-md w-full text-center space-y-8">
+          <div>
+            <div className="mx-auto h-16 w-16 bg-indigo-500 rounded-xl flex items-center justify-center text-3xl">
+              ⚡
+            </div>
+            <h2 className="mt-6 text-3xl font-extrabold tracking-tight">
+              Digit Recognizer
+            </h2>
+            <p className="mt-2 text-sm text-gray-400">
+              Sign in to access the AI-powered identification tool
             </p>
-            <button
-              onClick={handleGoogleSignIn}
-              disabled={signingIn}
-              className="bg-white border-2 border-gray-300 px-6 py-3 rounded-lg shadow-md hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3 mx-auto w-full"
-            >
-              <svg className="w-6 h-6" viewBox="0 0 24 24">
-                <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-                <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-              </svg>
-              <span className="text-gray-700 font-semibold">
-                {signingIn ? 'Signing in...' : 'Sign in with Google'}
-              </span>
-            </button>
           </div>
+          <button
+            onClick={handleGoogleSignIn}
+            className="w-full flex items-center justify-center px-4 py-3 border border-transparent text-base font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 md:text-lg transition-all shadow-lg"
+          >
+            <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
+              <path
+                fill="currentColor"
+                d="M12.545,10.239v3.821h5.445c-0.712,2.315-2.647,3.972-5.445,3.972c-3.332,0-6.033-2.536-6.033-5.662s2.701-5.662,6.033-5.662c1.475,0,2.821,0.511,3.878,1.352l2.797-2.797C17.358,3.509,15.086,2.5,12.545,2.5c-5.65,0-10.239,4.589-10.239,10.239s4.589,10.239,10.239,10.239c5.12,0,9.602-3.698,10.239-9.072h-9.939V10.239z"
+              />
+            </svg>
+            Sign in with Google
+          </button>
         </div>
       </div>
     )
   }
 
-  // Logged in - Show main app with header
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
-      {/* Header with user info and sign out */}
-      <header className="bg-white shadow-sm px-6 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <img 
-            src={user.photoURL} 
-            alt="Profile" 
-            className="w-10 h-10 rounded-full border-2 border-gray-300"
-          />
-          <div>
-            <p className="font-medium text-gray-800">Welcome, {user.displayName}</p>
-            <p className="text-sm text-gray-500">{user.email}</p>
+    <div className="min-h-screen bg-gray-50">
+      {/* 1. FIXED NAVBAR */}
+      <nav className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between h-16">
+            
+            {/* Left Side: Logo */}
+            <div className="flex items-center">
+              <div className="flex-shrink-0 flex items-center">
+                <span className="h-8 w-8 bg-indigo-600 rounded-lg flex items-center justify-center text-white font-bold mr-2">
+                  DR
+                </span>
+                <h1 className="text-xl font-bold text-gray-900">DigitRecognizer</h1>
+              </div>
+            </div>
+
+            {/* Right Side: User Profile */}
+            <div className="flex items-center space-x-4">
+              <div className="hidden md:flex flex-col items-end">
+                <span className="text-sm font-medium text-gray-900">{user.displayName}</span>
+                <span className="text-xs text-gray-500">Verified User</span>
+              </div>
+              
+              <img
+                className="h-8 w-8 rounded-full border border-gray-300"
+                src={user.photoURL}
+                alt="User profile"
+              />
+              
+              <button
+                onClick={handleSignOut}
+                className="ml-2 p-2 rounded-full text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+                title="Sign Out"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                </svg>
+              </button>
+            </div>
           </div>
         </div>
-        <button
-          onClick={handleSignOut}
-          className="bg-red-500 text-white px-4 py-2 rounded-md hover:bg-red-600 transition shadow-sm"
-        >
-          Sign Out
-        </button>
-      </header>
+      </nav>
 
-      {/* Main content */}
-      <div className="py-12 px-4">
-        <div className="max-w-4xl mx-auto">
-          <h1 className="text-4xl font-bold text-center text-gray-800 mb-2">
-            Handwritten Digit Recognition
-          </h1>
-          <p className="text-center text-gray-600 mb-8">
-            Upload an image of a handwritten digit (0-9) to identify it using AI
+      {/* 2. MAIN CONTENT AREA */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+        <div className="text-center mb-10">
+          <h2 className="text-3xl font-extrabold text-gray-900 sm:text-4xl">
+            AI-Powered Digit Recognition
+          </h2>
+          <p className="mt-3 max-w-2xl mx-auto text-xl text-gray-500 sm:mt-4">
+            Upload a handwritten digit image and let our AI identify it instantly.
           </p>
-
-          <ImageUpload onAnalyze={handleAnalyze} />
-
-          {loading && (
-            <div className="mt-8 text-center">
-              <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-              <p className="mt-4 text-gray-600">{loadingText}</p>
-            </div>
-          )}
-
-          {error && (
-            <div className="mt-8 bg-red-50 border border-red-200 rounded-lg p-4 text-center">
-              <p className="text-red-600 font-medium">Error: {error}</p>
-            </div>
-          )}
-
-          {result && !loading && (
-            <div className="mt-8 bg-white rounded-xl shadow-lg p-8 text-center border-2 border-green-200">
-              <p className="text-gray-600 mb-2">Identified Digit:</p>
-              <p className="text-6xl font-bold text-green-600">{result}</p>
-            </div>
-          )}
         </div>
-      </div>
+
+        {/* 3. COMPONENT CONTAINER */}
+        <div className="bg-white overflow-hidden shadow-xl rounded-2xl border border-gray-100 max-w-3xl mx-auto">
+          <div className="p-6 sm:p-10">
+            <ImageUpload />
+          </div>
+        </div>
+      </main>
     </div>
   )
 }
