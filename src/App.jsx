@@ -14,6 +14,29 @@ const BackgroundBlobs = () => (
   </div>
 );
 
+const AnimatedBg = () => (
+  <svg
+    className="absolute inset-0 w-full h-full pointer-events-none opacity-30"
+    aria-hidden="true"
+    focusable="false"
+    viewBox="0 0 1440 600"
+    preserveAspectRatio="xMidYMid slice"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+    style={{ zIndex: 0 }}
+  >
+    <circle cx="200" cy="100" r="60" fill="#3b82f6" fillOpacity="0.2">
+      <animate attributeName="cy" values="100;120;100" dur="8s" repeatCount="indefinite" />
+    </circle>
+    <circle cx="1200" cy="200" r="40" fill="#8b5cf6" fillOpacity="0.3">
+      <animate attributeName="cy" values="200;220;200" dur="8s" repeatCount="indefinite" />
+    </circle>
+    <circle cx="700" cy="500" r="80" fill="#60a5fa" fillOpacity="0.1">
+      <animate attributeName="cy" values="500;520;500" dur="8s" repeatCount="indefinite" />
+    </circle>
+  </svg>
+);
+
 function App() {
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -55,6 +78,7 @@ function App() {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-bg-deep text-text-primary p-4 relative overflow-hidden">
         <BackgroundBlobs />
+        <AnimatedBg />
         <div className="bg-noise" />
         
         <div className="max-w-md w-full text-center space-y-8 relative z-10">
@@ -97,6 +121,7 @@ function App() {
   return (
     <div className="min-h-screen bg-bg-deep relative overflow-x-hidden">
       <BackgroundBlobs />
+      <AnimatedBg />
       <div className="bg-noise" />
       
       <ProfileChip user={user} onSignOut={handleSignOut} />
