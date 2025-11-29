@@ -1,11 +1,16 @@
 const { onRequest } = require("firebase-functions/v2/https");
 const { GoogleGenerativeAI } = require("@google/generative-ai");
-const cors = require("cors")({ origin: true });
+const cors = require("cors")({ origin: true }); // Allow all origins for now
 
-// Initialize Gemini with API key from environment
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+// 1. Access API Key safely (we'll set this in environment config)
+// For hackathon speed, we can use process.env if we deploy with secrets
+// Or we can use the secure defineSecret pattern, but let's stick to simple env for now.
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY; 
 
-exports.identifyDigit = onRequest(async (req, res) => {
+const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+
+exports.analyzeDigit = onRequest((req, res) => {
   // Enable CORS
   cors(req, res, async () => {
     if (req.method !== "POST") {
@@ -15,28 +20,38 @@ exports.identifyDigit = onRequest(async (req, res) => {
     try {
       const { imageBase64, mimeType } = req.body;
 
-      if (!imageBase64) {
-        return res.status(400).send("No image provided");
+      if (!imageBase64 || !mimeType) {
+        return res.status(400).send("Missing image data");
       }
 
-      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-      
+      // Clean base64 string if needed (remove data:image/png;base64, prefix)
+      const cleanBase64 = imageBase64.replace(/^data:image\/\w+;base64,/, "");
+
       const result = await model.generateContent([
-        "Identify the handwritten digit in this image. Return ONLY the number.",
+        "Look at this image of a handwritten digit. Identify the single digit (0-9) written in the image. Return ONLY the digit as a number with no additional text.",
         {
           inlineData: {
-            data: imageBase64,
-            mimeType: mimeType || "image/jpeg"
-          }
-        }
+            data: cleanBase64,
+            mimeType: mimeType,
+          },
+        },
       ]);
 
-      const text = result.response.text().trim();
-      res.json({ digit: text });
+      const digit = result.response.text().trim();
+      
+      // Basic validation
+      const match = digit.match(/\d/);
+      const finalDigit = match ? match[0] : null;
+
+      if (!finalDigit) {
+        return res.status(422).json({ error: "No digit identified" });
+      }
+
+      return res.status(200).json({ digit: finalDigit });
 
     } catch (error) {
-      console.error("Error identifying digit:", error);
-      res.status(500).json({ error: error.message });
+      console.error("Gemini Error:", error);
+      return res.status(500).json({ error: error.message });
     }
   });
 });
