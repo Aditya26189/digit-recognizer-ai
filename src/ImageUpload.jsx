@@ -258,32 +258,21 @@ export default function ImageUpload({ onAnalyze }) {
 
                 {/* Action Buttons */}
                 {!isAnalyzing && !recognizedDigit && (
-                  <div className="flex flex-col sm:flex-row gap-3">
+                  <div className="flex flex-col sm:flex-row gap-3 items-center sm:justify-center">
                     <button
                       onClick={handleAnalyze}
                       disabled={!auth.currentUser}
-                      className="
-                        flex-1 flex items-center justify-center gap-2
-                        bg-brand-orange hover:bg-brand-orange-dark active:scale-[0.98]
-                        text-white px-5 py-3 rounded-[10px] font-bold text-sm md:text-base
-                        transition-all duration-200 shadow-lg shadow-brand-orange/10
-                        disabled:opacity-50 disabled:cursor-not-allowed
-                        focus:outline-none focus:ring-[3px] focus:ring-brand-orange/20
-                      "
+                      className={`w-[150px] text-sm sm:text-base font-semibold bg-brand-orange/90 hover:bg-brand-orange text-white px-4 py-2.5 rounded-full transition shadow-lg shadow-orange-900/30 flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed ${
+                        !auth.currentUser ? '' : 'focus:outline-none focus:ring-2 focus:ring-brand-orange/40'
+                      }`}
                     >
-                      Analyze Digit
+                      <h2 className="text-base font-semibold">Analyze Digit</h2>
                     </button>
                     <button
                       onClick={handleClear}
-                      className="
-                        px-5 py-3 rounded-[10px] font-medium text-sm md:text-base
-                        text-text-secondary hover:text-text-primary
-                        border border-white/5 hover:border-white/10 hover:bg-white/5
-                        transition-all duration-200
-                        focus:outline-none focus:ring-[3px] focus:ring-slate-500/20
-                      "
+                      className="w-[150px] text-sm sm:text-base font-semibold text-white px-4 py-2.5 rounded-full transition shadow-lg shadow-black/20 border border-white/10 hover:bg-white/10"
                     >
-                      Clear
+                      <h2 className="text-base font-semibold">Clear</h2>
                     </button>
                   </div>
                 )}
@@ -345,7 +334,7 @@ export default function ImageUpload({ onAnalyze }) {
       {/* Result Display */}
       {recognizedDigit && !isAnalyzing && (
         <div className="mt-6 glass-card p-8 animate-scaleIn flex flex-col items-center text-center">
-          <p className="text-sm font-medium text-text-secondary mb-4 uppercase tracking-wider">Identified Digit</p>
+          <h2 className="text-sm font-medium text-text-secondary mb-4 uppercase tracking-wider">Identified Digit</h2>
           <div 
             className="
               inline-flex items-center justify-center
@@ -355,20 +344,20 @@ export default function ImageUpload({ onAnalyze }) {
               mb-6
             "
           >
-            <span className="text-6xl md:text-8xl font-bold text-white leading-none">
+            <h1 className="text-6xl md:text-8xl font-bold text-white leading-none">
               {recognizedDigit}
-            </span>
+            </h1>
           </div>
           <div className="flex items-center justify-center gap-2 text-emerald-400 bg-emerald-400/10 px-4 py-2 rounded-full border border-emerald-400/20">
             <CheckCircle className="w-4 h-4" />
-            <span className="text-sm font-medium">Successfully identified</span>
+            <h2 className="text-base font-semibold">Successfully identified</h2>
           </div>
           
           <button
             onClick={handleClear}
             className="mt-8 text-text-secondary hover:text-text-primary text-sm font-medium hover:underline decoration-brand-orange/50 underline-offset-4 transition-all"
           >
-            Analyze another image
+            <h2 className="text-base font-semibold">Analyze another image</h2>
           </button>
         </div>
       )}
@@ -378,8 +367,8 @@ export default function ImageUpload({ onAnalyze }) {
         <div className="mt-6 bg-red-500/10 border border-red-500/20 rounded-xl p-4 flex items-start gap-3 animate-fadeIn">
           <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
           <div>
-            <p className="text-red-300 font-medium">Error</p>
-            <p className="text-red-400 text-sm mt-1">{error}</p>
+            <h2 className="text-red-300 font-bold text-lg">Error</h2>
+            <h2 className="text-red-400 text-base mt-1 font-semibold">{error}</h2>
           </div>
         </div>
       )}

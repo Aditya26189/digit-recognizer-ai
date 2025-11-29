@@ -2,8 +2,6 @@ import { useState, useEffect } from 'react'
 import { auth, googleProvider } from './config/firebase'
 import { signInWithPopup, signOut, onAuthStateChanged } from 'firebase/auth'
 import ImageUpload from './ImageUpload'
-import ProfileChip from './components/ProfileChip'
-import { Lock } from 'lucide-react'
 
 // Background Blobs Component
 const BackgroundBlobs = () => (
@@ -37,9 +35,37 @@ const AnimatedBg = () => (
   </svg>
 );
 
+const SignInPage = ({ onSignIn }) => (
+  <div className="relative min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-blue-950 text-white flex items-center justify-center px-4 py-10 overflow-hidden">
+    <AnimatedBg />
+    <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(59,130,246,0.15),_transparent_55%)]" />
+    <div className="absolute inset-x-0 bottom-[-40%] h-[70%] bg-gradient-to-t from-blue-900/30 to-transparent blur-[120px]" />
+
+    <div className="relative z-10 w-full max-w-[400px] text-center space-y-8 p-10 rounded-[32px] bg-white/5 border border-white/10 shadow-2xl shadow-black/40 backdrop-blur">
+      <div className="mx-auto h-16 w-16 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-500 flex items-center justify-center text-3xl shadow-lg shadow-blue-900/30">
+        ⚡
+      </div>
+      <div className="space-y-3">
+        <h1 className="text-4xl font-bold tracking-tight">AI-powered handwritten digit analysis.</h1>
+      </div>
+
+      <button
+        onClick={onSignIn}
+        className="group w-full flex items-center justify-center gap-3 rounded-2xl bg-white text-gray-900 font-semibold py-3.5 shadow-xl shadow-blue-950/30 transition hover:-translate-y-0.5"
+        style={{ minHeight: '52px' }}
+      >
+        Continue with Google
+      </button>
+
+      <p className="text-xs text-white/50">No passwords. Just a secure Google sign in.</p>
+    </div>
+  </div>
+);
+
 function App() {
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [scrolled, setScrolled] = useState(false)
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
@@ -47,6 +73,12 @@ function App() {
       setLoading(false)
     })
     return () => unsubscribe()
+  }, [])
+
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 20)
+    window.addEventListener('scroll', onScroll)
+    return () => window.removeEventListener('scroll', onScroll)
   }, [])
 
   const handleGoogleSignIn = async () => {
@@ -66,6 +98,10 @@ function App() {
     }
   }
 
+  const navBarClasses = `flex items-center justify-between transition-all duration-300 px-6 ${
+        scrolled ? 'max-w-4xl mx-auto w-[90%] mt-4 rounded-full bg-gray-900/80 backdrop-blur-md border border-gray-700 shadow-2xl py-3' : 'w-full bg-transparent border-b border-gray-800/50 py-4'
+  }`
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-bg-deep">
@@ -75,47 +111,7 @@ function App() {
   }
 
   if (!user) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-bg-deep text-text-primary p-4 relative overflow-hidden">
-        <BackgroundBlobs />
-        <AnimatedBg />
-        <div className="bg-noise" />
-        
-        <div className="max-w-md w-full text-center space-y-8 relative z-10">
-          <div>
-            <div className="mx-auto h-16 w-16 bg-gradient-to-br from-brand-orange to-orange-600 rounded-xl flex items-center justify-center text-3xl shadow-lg shadow-orange-900/20">
-              ⚡
-            </div>
-            <h2 className="mt-6 text-4xl font-bold tracking-tight text-text-primary">
-              Digit Recognizer
-            </h2>
-            <p className="mt-2 text-text-secondary">
-              Sign in to access the AI-powered identification tool
-            </p>
-          </div>
-          
-          {/* Warning Badge */}
-          <div className="flex items-center justify-center gap-2 px-4 py-2.5 bg-yellow-500/10 text-yellow-500 border border-yellow-500/20 rounded-lg backdrop-blur-sm">
-            <Lock className="w-4 h-4 flex-shrink-0" />
-            <span className="text-sm font-medium">Sign in required for AI Analysis</span>
-          </div>
-          
-          <button
-            onClick={handleGoogleSignIn}
-            className="w-full flex items-center justify-center px-4 py-3 border border-transparent text-base font-medium rounded-lg text-white bg-brand-orange hover:bg-brand-orange-dark transition-all shadow-lg hover:shadow-orange-900/20 focus:outline-none focus:ring-2 focus:ring-brand-orange/40 active:scale-[0.98]"
-            style={{ minHeight: '44px' }}
-          >
-            <svg className="w-4 h-4 mr-2 flex-shrink-0" viewBox="0 0 24 24">
-              <path
-                fill="currentColor"
-                d="M12.545,10.239v3.821h5.445c-0.712,2.315-2.647,3.972-5.445,3.972c-3.332,0-6.033-2.536-6.033-5.662s2.701-5.662,6.033-5.662c1.475,0,2.821,0.511,3.878,1.352l2.797-2.797C17.358,3.509,15.086,2.5,12.545,2.5c-5.65,0-10.239,4.589-10.239,10.239s4.589,10.239,10.239,10.239c5.12,0,9.602-3.698,10.239-9.072h-9.939V10.239z"
-              />
-            </svg>
-            Sign in with Google
-          </button>
-        </div>
-      </div>
-    )
+    return <SignInPage onSignIn={handleGoogleSignIn} />
   }
 
   return (
@@ -124,9 +120,21 @@ function App() {
       <AnimatedBg />
       <div className="bg-noise" />
       
-      <ProfileChip user={user} onSignOut={handleSignOut} />
+      <header className="relative w-full z-20 px-4 pt-6">
+        <nav className={`${navBarClasses} flex items-center gap-4`}>
+          <div className="text-center flex-1">
+            <h1 className="text-lg font-bold tracking-tight text-white">AI Digit Recognizer</h1>
+          </div>
+          <button
+            onClick={handleSignOut}
+            className="w-[150px] text-sm sm:text-base font-semibold bg-brand-orange/90 hover:bg-brand-orange text-white px-4 py-2.5 rounded-full transition shadow-lg shadow-orange-900/30 flex items-center justify-center"
+          >
+            <h2 className="text-base font-semibold">Sign Out</h2>
+          </button>
+        </nav>
+      </header>
       
-      <main className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 md:py-20 flex flex-col items-center">
+      <main className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-12 pb-12 md:pb-20 flex flex-col items-center">
         <div className="text-center mb-12 max-w-3xl">
           <h1 className="text-4xl md:text-5xl lg:text-[52px] font-bold text-text-primary tracking-tight mb-4 leading-tight">
             AI-Powered Digit Recognition
