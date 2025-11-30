@@ -123,7 +123,7 @@ function App() {
       <header className="relative w-full z-20 px-4 pt-6">
         <nav className={`${navBarClasses} flex items-center gap-4`}>
           <div className="text-center flex-1">
-            <h1 className="text-lg font-bold tracking-tight text-white">AI Digit Recognizer</h1>
+            <h1 className="text-lg font-bold tracking-tight text-white">AI-Powered Digit Recognition</h1>
           </div>
           <button
             onClick={handleSignOut}
@@ -136,12 +136,9 @@ function App() {
       
       <main className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-12 pb-12 md:pb-20 flex flex-col items-center">
         <div className="text-center mb-12 max-w-3xl">
-          <h1 className="text-4xl md:text-5xl lg:text-[52px] font-bold text-text-primary tracking-tight mb-4 leading-tight">
-            AI-Powered Digit Recognition
-          </h1>
-          <p className="text-lg md:text-xl text-text-secondary max-w-[60ch] mx-auto font-normal">
+          <h3 className="text-lg md:text-xl text-text-secondary max-w-[60ch] mx-auto font-normal">
             Upload an image of a handwritten digit and let AI identify it instantly
-          </p>
+          </h3>
         </div>
 
         <ImageUpload />
