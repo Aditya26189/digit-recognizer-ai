@@ -78,7 +78,7 @@ export function checkRateLimit(userId) {
     
     return {
       allowed: false,
-      reason: `Upload limit reached. You can upload ${HOURLY_LIMIT} images per hour. Please wait ${minutesLeft} minute${minutesLeft !== 1 ? 's' : ''}.`,
+      reason: `You have uploaded ${HOURLY_LIMIT} images. Try after an hour.`,
       waitTime,
       hourlyCount,
       dailyCount
@@ -93,7 +93,7 @@ export function checkRateLimit(userId) {
     
     return {
       allowed: false,
-      reason: `Daily limit reached. You can upload ${DAILY_LIMIT} images per day. Please wait ${hoursLeft} hour${hoursLeft !== 1 ? 's' : ''}.`,
+      reason: `You have uploaded ${DAILY_LIMIT} images today. Try after ${hoursLeft} hour${hoursLeft !== 1 ? 's' : ''}.`,
       waitTime,
       hourlyCount,
       dailyCount

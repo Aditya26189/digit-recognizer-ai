@@ -28,7 +28,7 @@ exports.analyzeDigit = onRequest((req, res) => {
       const cleanBase64 = imageBase64.replace(/^data:image\/\w+;base64,/, "");
 
       const result = await model.generateContent([
-        "Look at this image and identify the complete number written in it. The number can be any whole number (single digit, double digit, or more). Return ONLY the number with no additional text, spaces, or punctuation. If there is no number in the image, return -1.",
+        "You are a number recognition AI. Look at this image and identify the COMPLETE NUMBER written in it. IMPORTANT: If the image shows '2025', you must return '2025', not just '2'. If it shows '123', return '123', not just '1'. Return the ENTIRE number as shown in the image. Return ONLY the complete number with no additional text, spaces, punctuation, or explanations. If there is no number visible in the image, return -1.",
         {
           inlineData: {
             data: cleanBase64,
@@ -37,17 +37,19 @@ exports.analyzeDigit = onRequest((req, res) => {
         },
       ]);
 
-      const digit = result.response.text().trim();
+      const responseText = result.response.text().trim();
+      console.log("Gemini raw response:", responseText);
       
       // Check if -1 was returned (no number found)
-      if (digit === "-1" || digit === -1) {
+      if (responseText === "-1" || responseText === -1) {
         return res.status(200).json({ digit: "-1" });
       }
       
-      // Validate that it's a valid number
-      const match = digit.match(/^\d+$/);
-      const finalDigit = match ? digit : "-1";
-
+      // Validate that it's a valid number (only digits, no other characters)
+      const match = responseText.match(/^\d+$/);
+      const finalDigit = match ? responseText : "-1";
+      
+      console.log("Final digit returned:", finalDigit);
       return res.status(200).json({ digit: finalDigit });
 
     } catch (error) {
