@@ -3,6 +3,7 @@ import { Upload, CheckCircle, AlertCircle, Loader2, X, ExternalLink, Copy } from
 import { uploadImageToStorage } from './utils/storageService';
 import { auth } from './config/firebase';
 import { identifyDigit } from './utils/geminiService';
+import { checkRateLimit, recordUpload } from './utils/rateLimiter';
 
 export default function ImageUpload({ onAnalyze }) {
   const [selectedFile, setSelectedFile] = useState(null);
@@ -92,6 +93,13 @@ export default function ImageUpload({ onAnalyze }) {
       return;
     }
 
+    // Check rate limit before uploading
+    const rateLimitCheck = checkRateLimit(auth.currentUser.uid);
+    if (!rateLimitCheck.allowed) {
+      setError(rateLimitCheck.reason);
+      return;
+    }
+
     try {
       setIsAnalyzing(true);
       setError(null);
@@ -109,6 +117,9 @@ export default function ImageUpload({ onAnalyze }) {
         );
         downloadURL = uploadResult.downloadURL;
         setUploadedImageURL(downloadURL);
+        
+        // Record successful upload for rate limiting
+        recordUpload(auth.currentUser.uid);
       } catch (uploadError) {
         console.error('Storage upload error:', uploadError);
         setStorageError('Storage upload failed');
@@ -118,9 +129,9 @@ export default function ImageUpload({ onAnalyze }) {
       setUploadProgress("Analyzing with AI...");
       const digit = await identifyDigit(selectedFile);
       
-      // Check if -1 was returned (no digit found)
+      // Check if -1 was returned (no number found)
       if (digit === '-1' || digit === -1) {
-        setError('No digit found in the image. Please try a different image.');
+        setError('No number found in the image. Please try a different image.');
         setRecognizedDigit(null);
       } else {
         setRecognizedDigit(digit);
@@ -334,7 +345,7 @@ export default function ImageUpload({ onAnalyze }) {
       {/* Result Display */}
       {recognizedDigit && !isAnalyzing && (
         <div className="mt-6 glass-card p-8 animate-scaleIn flex flex-col items-center text-center">
-          <h2 className="text-sm font-medium text-text-secondary mb-4 uppercase tracking-wider">Identified Digit</h2>
+          <h2 className="text-sm font-medium text-text-secondary mb-4 uppercase tracking-wider">Identified Number</h2>
           <div 
             className="
               inline-flex items-center justify-center

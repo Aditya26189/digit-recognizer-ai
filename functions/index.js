@@ -28,7 +28,7 @@ exports.analyzeDigit = onRequest((req, res) => {
       const cleanBase64 = imageBase64.replace(/^data:image\/\w+;base64,/, "");
 
       const result = await model.generateContent([
-        "Look at this image of a handwritten digit. Identify the single digit (0-9) written in the image. Return ONLY the digit as a number with no additional text. If there is no digit in the image, return -1.",
+        "Look at this image and identify the complete number written in it. The number can be any whole number (single digit, double digit, or more). Return ONLY the number with no additional text, spaces, or punctuation. If there is no number in the image, return -1.",
         {
           inlineData: {
             data: cleanBase64,
@@ -39,14 +39,14 @@ exports.analyzeDigit = onRequest((req, res) => {
 
       const digit = result.response.text().trim();
       
-      // Check if -1 was returned (no digit found)
+      // Check if -1 was returned (no number found)
       if (digit === "-1" || digit === -1) {
         return res.status(200).json({ digit: "-1" });
       }
       
-      // Basic validation for digits 0-9
-      const match = digit.match(/\d/);
-      const finalDigit = match ? match[0] : "-1";
+      // Validate that it's a valid number
+      const match = digit.match(/^\d+$/);
+      const finalDigit = match ? digit : "-1";
 
       return res.status(200).json({ digit: finalDigit });
 
