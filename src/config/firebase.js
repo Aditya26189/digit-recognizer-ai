@@ -2,6 +2,7 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider } from 'firebase/auth';
 import { getStorage } from 'firebase/storage';
+import { getFirestore } from 'firebase/firestore';
 
 // Firebase configuration from environment variables
 const firebaseConfig = {
@@ -15,6 +16,7 @@ const firebaseConfig = {
 
 let auth = null;
 let storage = null;
+let db = null;
 let googleProvider = null;
 
 try {
@@ -24,6 +26,7 @@ try {
   // Initialize Firebase services
   auth = getAuth(app);
   storage = getStorage(app);
+  db = getFirestore(app);
   googleProvider = new GoogleAuthProvider();
 
 } catch (error) {
@@ -31,4 +34,4 @@ try {
 }
 
 // Export Firebase services
-export { auth, storage, googleProvider };
+export { auth, storage, db, googleProvider };

@@ -1,6 +1,11 @@
 const { onRequest } = require("firebase-functions/v2/https");
+const { onSchedule: scheduleFunction } = require("firebase-functions/v2/scheduler");
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 const cors = require("cors")({ origin: true }); // Allow all origins for now
+const admin = require("firebase-admin");
+
+// Initialize Firebase Admin
+admin.initializeApp();
 
 // 1. Access API Key safely (we'll set this in environment config)
 // For hackathon speed, we can use process.env if we deploy with secrets
@@ -54,6 +59,118 @@ exports.analyzeDigit = onRequest((req, res) => {
 
     } catch (error) {
       console.error("Gemini Error:", error);
+      return res.status(500).json({ error: error.message });
+    }
+  });
+});
+
+// Scheduled function to clean up old images (runs daily at 2 AM)
+exports.cleanupOldImages = scheduleFunction(
+  {
+    schedule: "0 2 * * *", // Runs every day at 2:00 AM (cron format)
+    timeZone: "America/Los_Angeles", // Adjust to your timezone
+  },
+  async (event) => {
+    console.log("Starting scheduled cleanup of old images...");
+    
+    const db = admin.firestore();
+    const storage = admin.storage();
+    const bucket = storage.bucket();
+    
+    try {
+      // Calculate cutoff time (24 hours ago)
+      const oneDayAgo = Date.now() - (24 * 60 * 60 * 1000);
+      
+      // Query for images older than 1 day
+      const oldImagesSnapshot = await db
+        .collection("uploadedImages")
+        .where("createdAt", "<", oneDayAgo)
+        .get();
+      
+      console.log(`Found ${oldImagesSnapshot.size} images to delete`);
+      
+      let deleted = 0;
+      let failed = 0;
+      
+      // Delete each image from Storage and Firestore
+      for (const doc of oldImagesSnapshot.docs) {
+        const data = doc.data();
+        
+        try {
+          // Delete from Storage
+          await bucket.file(data.filePath).delete();
+          console.log(`Deleted from storage: ${data.filePath}`);
+          
+          // Delete metadata from Firestore
+          await doc.ref.delete();
+          console.log(`Deleted metadata: ${doc.id}`);
+          
+          deleted++;
+        } catch (error) {
+          console.error(`Failed to delete ${data.filePath}:`, error);
+          failed++;
+        }
+      }
+      
+      console.log(`Cleanup complete: ${deleted} deleted, ${failed} failed`);
+      return { deleted, failed };
+      
+    } catch (error) {
+      console.error("Cleanup error:", error);
+      throw error;
+    }
+  }
+);
+
+// Optional: Manual cleanup function that can be called via HTTP
+exports.manualCleanup = onRequest(async (req, res) => {
+  cors(req, res, async () => {
+    if (req.method !== "POST") {
+      return res.status(405).send("Method Not Allowed");
+    }
+    
+    console.log("Starting manual cleanup of old images...");
+    
+    const db = admin.firestore();
+    const storage = admin.storage();
+    const bucket = storage.bucket();
+    
+    // Get daysOld from request body, default to 1
+    const daysOld = req.body.daysOld || 1;
+    
+    try {
+      const cutoffTime = Date.now() - (daysOld * 24 * 60 * 60 * 1000);
+      
+      const oldImagesSnapshot = await db
+        .collection("uploadedImages")
+        .where("createdAt", "<", cutoffTime)
+        .get();
+      
+      console.log(`Found ${oldImagesSnapshot.size} images to delete`);
+      
+      let deleted = 0;
+      let failed = 0;
+      const errors = [];
+      
+      for (const doc of oldImagesSnapshot.docs) {
+        const data = doc.data();
+        
+        try {
+          await bucket.file(data.filePath).delete();
+          await doc.ref.delete();
+          deleted++;
+        } catch (error) {
+          console.error(`Failed to delete ${data.filePath}:`, error);
+          failed++;
+          errors.push({ filePath: data.filePath, error: error.message });
+        }
+      }
+      
+      console.log(`Manual cleanup complete: ${deleted} deleted, ${failed} failed`);
+      return res.status(200).json({ deleted, failed, errors });
+      
+    } catch (error) {
+      console.error("Manual cleanup error:", error);
       return res.status(500).json({ error: error.message });
     }
   });

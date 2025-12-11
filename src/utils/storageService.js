@@ -1,6 +1,7 @@
-// Firebase Storage imports
-import { storage } from '../config/firebase';
+// Firebase Storage and Firestore imports
+import { storage, db } from '../config/firebase';
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
+import { collection, addDoc, doc, deleteDoc, query, where, getDocs, serverTimestamp } from 'firebase/firestore';
 
 /**
  * Uploads an image file to Firebase Storage.
@@ -44,13 +45,37 @@ export async function uploadImageToStorage(file, userId) {
     const downloadURL = await getDownloadURL(storageRef);
     console.log('Download URL:', downloadURL);
 
+    // Store metadata in Firestore for tracking and cleanup
+    const metadata = {
+      userId,
+      filePath,
+      downloadURL,
+      fileName: originalName,
+      fileSize: file.size,
+      uploadedAt: serverTimestamp(),
+      createdAt: timestamp // Keep numeric timestamp for easier querying
+    };
+
+    let docId = null;
+    if (db) {
+      try {
+        const docRef = await addDoc(collection(db, 'uploadedImages'), metadata);
+        docId = docRef.id;
+        console.log('Metadata saved to Firestore:', docId);
+      } catch (firestoreError) {
+        console.error('Failed to save metadata to Firestore:', firestoreError);
+        // Don't fail the upload if metadata save fails
+      }
+    }
+
     // Return result object
     return {
       downloadURL,
       filePath,
       uploadedAt: timestamp,
       fileSize: file.size,
-      fileName: originalName
+      fileName: originalName,
+      docId // Include document ID for future reference
     };
 
   } catch (error) {
@@ -72,12 +97,13 @@ export async function uploadImageToStorage(file, userId) {
 }
 
 /**
- * Deletes an image from Firebase Storage.
+ * Deletes an image from Firebase Storage and Firestore.
  * @param {string} filePath - The storage path of the file to delete.
+ * @param {string} docId - Optional Firestore document ID to delete metadata.
  * @returns {Promise<boolean>} - True if deletion was successful.
  * @throws {Error} If deletion fails.
  */
-export async function deleteImage(filePath) {
+export async function deleteImage(filePath, docId = null) {
   if (!filePath || filePath.trim() === '') {
     throw new Error('File path required');
   }
@@ -87,9 +113,33 @@ export async function deleteImage(filePath) {
   }
 
   try {
+    // Delete from Storage
     const storageRef = ref(storage, filePath);
     await deleteObject(storageRef);
     console.log('File deleted successfully:', filePath);
+
+    // Delete metadata from Firestore if docId provided
+    if (db && docId) {
+      try {
+        await deleteDoc(doc(db, 'uploadedImages', docId));
+        console.log('Metadata deleted from Firestore:', docId);
+      } catch (firestoreError) {
+        console.error('Failed to delete metadata from Firestore:', firestoreError);
+      }
+    } else if (db && !docId) {
+      // If no docId provided, try to find and delete by filePath
+      try {
+        const q = query(collection(db, 'uploadedImages'), where('filePath', '==', filePath));
+        const querySnapshot = await getDocs(q);
+        querySnapshot.forEach(async (document) => {
+          await deleteDoc(doc(db, 'uploadedImages', document.id));
+          console.log('Metadata deleted from Firestore:', document.id);
+        });
+      } catch (firestoreError) {
+        console.error('Failed to delete metadata from Firestore:', firestoreError);
+      }
+    }
+
     return true;
   } catch (error) {
     console.error('Storage delete error:', error);
@@ -101,5 +151,86 @@ export async function deleteImage(filePath) {
     } else {
       throw new Error('Delete failed: ' + error.message);
     }
+  }
+}
+
+/**
+ * Deletes images older than specified days.
+ * @param {number} daysOld - Number of days. Images older than this will be deleted (default: 1 day).
+ * @returns {Promise<{deleted: number, failed: number, errors: Array}>} - Summary of deletion results.
+ */
+export async function deleteOldImages(daysOld = 1) {
+  if (!db) {
+    throw new Error('Firestore not configured');
+  }
+
+  const results = {
+    deleted: 0,
+    failed: 0,
+    errors: []
+  };
+
+  try {
+    // Calculate timestamp for cutoff date
+    const cutoffTime = Date.now() - (daysOld * 24 * 60 * 60 * 1000);
+    console.log(`Searching for images older than ${daysOld} day(s)...`);
+
+    // Query Firestore for old images
+    const q = query(
+      collection(db, 'uploadedImages'),
+      where('createdAt', '<', cutoffTime)
+    );
+
+    const querySnapshot = await getDocs(q);
+    console.log(`Found ${querySnapshot.size} images to delete`);
+
+    // Delete each image
+    for (const document of querySnapshot.docs) {
+      const data = document.data();
+      try {
+        await deleteImage(data.filePath, document.id);
+        results.deleted++;
+        console.log(`Deleted: ${data.filePath}`);
+      } catch (error) {
+        results.failed++;
+        results.errors.push({
+          filePath: data.filePath,
+          error: error.message
+        });
+        console.error(`Failed to delete ${data.filePath}:`, error);
+      }
+    }
+
+    console.log(`Cleanup complete: ${results.deleted} deleted, ${results.failed} failed`);
+    return results;
+
+  } catch (error) {
+    console.error('Error during cleanup:', error);
+    throw new Error('Cleanup failed: ' + error.message);
+  }
+}
+
+/**
+ * Gets count of images older than specified days.
+ * @param {number} daysOld - Number of days (default: 1 day).
+ * @returns {Promise<number>} - Count of old images.
+ */
+export async function getOldImagesCount(daysOld = 1) {
+  if (!db) {
+    throw new Error('Firestore not configured');
+  }
+
+  try {
+    const cutoffTime = Date.now() - (daysOld * 24 * 60 * 60 * 1000);
+    const q = query(
+      collection(db, 'uploadedImages'),
+      where('createdAt', '<', cutoffTime)
+    );
+
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.size;
+  } catch (error) {
+    console.error('Error counting old images:', error);
+    throw new Error('Failed to count old images: ' + error.message);
   }
 }
